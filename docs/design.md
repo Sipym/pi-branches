@@ -1,10 +1,10 @@
 # pi-branches 设计文档
 
-- 版本：v0.2（机制闭环 + 发布形态定稿，待实现）
+- 版本：v0.3（机制 + 发布形态 + 开发节奏定稿，待实现）
 - 日期：2026-02-14
 - 分支：`feat/pi-branches`（基线 `b764f19`；迁独立仓库后以新仓库为准）
 - 状态：设计定稿；实现从路线 M0 开始
-- 目标形态：独立开源仓库，以 Pi Package（npm/git 双源）发布
+- 目标形态：开发期驻留 `~/.pi` 仓库（`agent/extensions/pi-branches`）自用打磨；成熟后拆出独立开源仓库，以 Pi Package（npm/git 双源）发布
 
 ## 1. 背景与目标
 
@@ -117,6 +117,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 | 8 | 多 pane 单 window 网格，永不抢焦点 | 沿用 interactive-subagents 已验证的 tmux 层 |
 | 9 | tmux 前置检测：`$TMUX` + tmux 可执行，缺则明确报错+引导 | 避免运行时报错/静默失败；session_start 即探测并提示 |
 | 10 | 发布形态：Pi Package（npm+git 双源、MIT、上游致谢、零本机私有扩展依赖） | 开源可用性与合规优先；走生态标准安装路径 |
+| 11 | 开发节奏：先在 `~/.pi` 自用打磨（M0-M4），成熟后拆出独立仓库发布（M5） | 尽早验证真实使用价值；拆出前零发布负担，拆出时历史可完整迁移 |
 
 补充约束：回填消息用 customType `branch_merge`，`content` 进模型上下文，结构化字段（mergeId、forkEntryId 等）放 `details`，配 entry renderer 做折叠渲染。
 
@@ -136,7 +137,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 
 ## 8. 发布与分发
 
-本项目定位为独立开源仓库，以 **Pi Package** 形态发布：
+开发期驻留 `~/.pi` 仓库（`agent/extensions/pi-branches`，走本仓库扩展流程）自用打磨；成熟后按 §10 路线 M5 拆出独立开源仓库，以 **Pi Package** 形态发布：
 
 - 分发通道：npm 包 + git repo 双源（`pi install npm:@<scope>/pi-branches` / `pi install git:github.com/<user>/pi-branches`）；npm 侧加 `pi-package` keyword 进入官方 package gallery。
 - manifest：`package.json` 声明 `pi` 资源字段；host 提供的 `@earendil-works/*` 与 `typebox` 一律 `peerDependencies: "*"`，不打进 tarball。
@@ -157,6 +158,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 | **M1 核心闭环** | `/ask`（只读、单 window 网格、tmux 检测）→ `/done`（子侧总结+sidecar）→ 父侧静默回填 + 最小 widget | 3 个问题并行，全部静默落入主会话 transcript |
 | **M2 健壮性** | mergeId 幂等、登记表持久化、孤儿启动恢复、`/branches` 列表与清理 | 崩溃重启 / 主会话先退 / 手滑多次 `/done` 三类注入测试 |
 | **M3 增强** | `--wake` / `--join` barrier、`--write` + 内置轻量文件留痕、多段增量交付 | 对应 flag 行为测试 |
-| **M4 收尾** | 渲染打磨、发布准备（README、demo、CI 版本矩阵、npm/git 双源、gallery 提交）、按需加载进个人环境（需授权） | 真实使用一周无阻塞；`pi install` 全链路可用 |
+| **M4 自用收尾** | 渲染打磨、双语 README（README.md + README.zh-CN.md）、按需加载进个人环境（需授权） | 真实使用一周无阻塞 |
+| **M5 拆出发布** | 拆出独立仓库（保留历史，如 subtree split）；package.json `pi` 声明、npm+git 双源、CI 版本矩阵、gallery 提交；`~/.pi` 改为 `pi install` 引用 | `pi install npm:`/`git:` 全链路可用；上游致谢与命名检查完成 |
 
 M1 步骤 0：先读 `agent/extensions/AGENTS.md` 与 `MAINTAINING.md`，依赖安装与脚本一律走 pnpm workspace（`agent/` 根），不新增扩展级 lockfile。
