@@ -1,9 +1,10 @@
 # pi-branches 设计文档
 
-- 版本：v0.1（机制闭环，待实现）
+- 版本：v0.2（机制闭环 + 发布形态定稿，待实现）
 - 日期：2026-02-14
-- 分支：`feat/pi-branches`（基线 `b764f19`）
+- 分支：`feat/pi-branches`（基线 `b764f19`；迁独立仓库后以新仓库为准）
 - 状态：设计定稿；实现从路线 M0 开始
+- 目标形态：独立开源仓库，以 Pi Package（npm/git 双源）发布
 
 ## 1. 背景与目标
 
@@ -115,6 +116,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 | 7 | 并发安全靠 append-only + 父侧 watcher 单事件循环串行 | 无需锁；`.done` 按完成顺序排队消费 |
 | 8 | 多 pane 单 window 网格，永不抢焦点 | 沿用 interactive-subagents 已验证的 tmux 层 |
 | 9 | tmux 前置检测：`$TMUX` + tmux 可执行，缺则明确报错+引导 | 避免运行时报错/静默失败；session_start 即探测并提示 |
+| 10 | 发布形态：Pi Package（npm+git 双源、MIT、上游致谢、零本机私有扩展依赖） | 开源可用性与合规优先；走生态标准安装路径 |
 
 补充约束：回填消息用 customType `branch_merge`，`content` 进模型上下文，结构化字段（mergeId、forkEntryId 等）放 `details`，配 entry renderer 做折叠渲染。
 
@@ -132,18 +134,29 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 - 跨机器/远程 pane；摘要质量自动评估；树状 UI 可视化（`/tree` 已有）。
 - 分支内再嵌套 `/ask`（技术上可行，v1 禁用以控复杂度）。
 
-## 8. 测试策略
+## 8. 发布与分发
 
-沿用 `pi-interactive-subagents/test` 的 integration 模式：独立进程起父子会话、真实 tmux、fake/低成本模型；重点用例：多分支并发回填顺序、mergeId 幂等、孤儿恢复、非 tmux 环境 `/ask` 报错路径、`/done` 无增量幂等提示、`--write` 分支 files-touched 留痕。
+本项目定位为独立开源仓库，以 **Pi Package** 形态发布：
 
-## 9. 路线
+- 分发通道：npm 包 + git repo 双源（`pi install npm:@<scope>/pi-branches` / `pi install git:github.com/<user>/pi-branches`）；npm 侧加 `pi-package` keyword 进入官方 package gallery。
+- manifest：`package.json` 声明 `pi` 资源字段；host 提供的 `@earendil-works/*` 与 `typebox` 一律 `peerDependencies: "*"`，不打进 tarball。
+- License：MIT。上游致谢：tmux 表面层与 sidecar 生命周期模式源自 `HazAT/pi-interactive-subagents`（MIT，经 amosblomqvist fork），随仓库附 UPSTREAM 记录复用范围。
+- 依赖约束：**零本机私有扩展依赖**（command-gate、pi-files-touched 等不进依赖面）；文件留痕等能力内置轻量实现。
+- 兼容声明：明确支持的 pi 版本范围（参考上游 "for Pi 0.84.3" 做法），CI 固定版本矩阵跑 integration 测试。
+- 命名检查：发布前核对 npm 与 GitHub 的 `pi-branches` 名称占用，冲突则换名。
+
+## 9. 测试策略
+
+沿用 `pi-interactive-subagents/test` 的 integration 模式：独立进程起父子会话、真实 tmux、fake/低成本模型；重点用例：多分支并发回填顺序、mergeId 幂等、孤儿恢复、非 tmux 环境 `/ask` 报错路径、`/done` 无增量幂等提示、`--write` 分支内置文件留痕。
+
+## 10. 路线
 
 | 里程碑 | 内容 | 验证标准 |
 |---|---|---|
 | **M0 手工验证** | 零代码：shell alias + `pi --fork` + 手动 tmux 开窗，跑通"提问→讨论→摘要→贴回" | 体验假设成立；产出痛点清单反哺设计 |
 | **M1 核心闭环** | `/ask`（只读、单 window 网格、tmux 检测）→ `/done`（子侧总结+sidecar）→ 父侧静默回填 + 最小 widget | 3 个问题并行，全部静默落入主会话 transcript |
 | **M2 健壮性** | mergeId 幂等、登记表持久化、孤儿启动恢复、`/branches` 列表与清理 | 崩溃重启 / 主会话先退 / 手滑多次 `/done` 三类注入测试 |
-| **M3 增强** | `--wake` / `--join` barrier、`--write` + files-touched 集成、多段增量交付 | 对应 flag 行为测试 |
-| **M4 收尾** | 渲染打磨、README、按需加载进运行环境（需用户授权） | 真实使用一周无阻塞 |
+| **M3 增强** | `--wake` / `--join` barrier、`--write` + 内置轻量文件留痕、多段增量交付 | 对应 flag 行为测试 |
+| **M4 收尾** | 渲染打磨、发布准备（README、demo、CI 版本矩阵、npm/git 双源、gallery 提交）、按需加载进个人环境（需授权） | 真实使用一周无阻塞；`pi install` 全链路可用 |
 
 M1 步骤 0：先读 `agent/extensions/AGENTS.md` 与 `MAINTAINING.md`，依赖安装与脚本一律走 pnpm workspace（`agent/` 根），不新增扩展级 lockfile。
