@@ -24,10 +24,14 @@ window="branches-${pshort}"
 sid="m0-${pshort}-${id}"
 
 # --- 同一会话的问题 pane 集中在一个专用 window, 不抢主窗口焦点 (design §3.1) ---
-tmux list-windows -F '#{window_name}' | grep -qx "$window" || tmux new-window -d -n "$window"
-tmux split-window -d -t "$window" \
-  "printf '\033]2;%s\033\\' 'Q:${question:0:30}'; pi --fork '${parent}' --session-id '${sid}' -n 'M0 ${id}: ${question:0:40}'; exec zsh"
-tmux select-layout -t "$window" tiled >/dev/null 2>&1 || true
+# 首个分支直接以命令建窗(避免 new-window 默认自带的空 shell pane), 后续分支再 split
+cmd="printf '\033]2;%s\033\\\\' 'Q:${question:0:30}'; pi --fork '${parent}' --session-id '${sid}' -n 'M0 ${id}: ${question:0:40}'; exec zsh"
+if tmux list-windows -F '#{window_name}' | grep -qx "$window"; then
+  tmux split-window -d -t "$window" "$cmd"
+  tmux select-layout -t "$window" tiled >/dev/null 2>&1 || true
+else
+  tmux new-window -d -n "$window" "$cmd"
+fi
 
 echo "✓ 分支 ${sid} 已创建"
 echo "  窗口: ${window}  (切换: tmux select-window -t ${window} 或 prefix+')"
