@@ -107,7 +107,14 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
    ├── /drop ──▶ dropped（归档，零主线消息）
    └── pane 关闭/进程退出──▶ exited ──有增量且无 .drop？──▶ 父侧兜底总结
 ```
-```
+
+### 3.5 分支身份与防遗忘引导
+
+三层标识，让分支 pane 从视觉到模型自知都可辨识（沿用于 interactive-subagents 的 widget 先例）：
+
+1. **常驻身份 widget（child 扩展，编辑器上方）**：折叠态一行——`分支 q1 · 属主会话 01a1251d "…" · 已交付 1 段`；`Ctrl+Alt+O` 展开 = **内置使用文档**：`/done [聚焦指令]`（含示例：`/done 以"为何否掉 A 方案"为核心总结`）、`/drop [原因]`（免回填归档）、当前状态、归档找回命令。文档内容随命令面演进同步维护。
+2. **首条定位消息（fork 时自动注入）**：问题 + 定位说明（"你是主会话 X 的分支，仅围绕此问题讨论"）——模型侧身份自觉，治痛点 #4。
+3. **命名与 pane 标识**：tmux window `branches-<短id>`、pane title `Q:问题缩写`、会话名 `branch-<短id>-<q>`；session 文件头 `parentSession` 链接（M0 已验证存在）。
 
 `/done` 流程（子侧）：
 
@@ -134,6 +141,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 | 10 | 发布形态：Pi Package（npm+git 双源、MIT、上游致谢、零本机私有扩展依赖） | 开源可用性与合规优先；走生态标准安装路径 |
 | 11 | 开发节奏：先在 `~/.pi` 自用打磨（M0-M4），成熟后拆出独立仓库发布（M5） | 尽早验证真实使用价值；拆出前零发布负担，拆出时历史可完整迁移 |
 | 12 | 结束二元化：`/done [聚焦指令]` 回填（指令可定制回填物形态）+ `/drop` 免回填归档；决定点在结束时而非 `/ask` 时 | 答疑型分支本就不该回填；聊完才知道要不要留、以什么视角留 |
+| 13 | 防遗忘三件套：常驻身份 widget（折叠一行/展开全文档）+ 首条定位消息 + 命名约定 | 分支 pane 与普通会话视觉无区分、忘记 /done /drop 用法、子 pi 无身份自觉（痛点 #4）都直接损害可用性；文档 in place 优于查 README |
 
 补充约束：回填消息用 customType `branch_merge`，`content` 进模型上下文，结构化字段（mergeId、forkEntryId 等）放 `details`，配 entry renderer 做折叠渲染。
 
