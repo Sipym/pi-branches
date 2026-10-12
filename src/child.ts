@@ -1,6 +1,7 @@
 /**
- * 子侧扩展（分支会话加载）：身份 widget（方案 B）、首条定位消息（三合一，幂等）、
- * /done 交付增量、/drop 免回填归档（design.md §3.5/§4/§5）。
+ * Child-side extension (loaded inside branch sessions): identity widget (option B),
+ * the first identity message (three-in-one, idempotent), /done incremental merge,
+ * /drop zero-backfill archive (design.md §3.5/§4/§5).
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, Text } from "@earendil-works/pi-tui";
@@ -15,7 +16,7 @@ interface CmdCtx extends WidgetCtx {
   ui: WidgetCtx["ui"] & { notify: (msg: string, level?: string) => void };
 }
 
-/** theme 防御包装：theme 不可用时原样返回。 */
+/** Defensive theme wrapper: return text unchanged when theme is unavailable. */
 function fg(theme: unknown, key: string, text: string): string {
   const t = theme as Record<string, ((k: string, s: string) => string) | undefined> | null;
   try {
@@ -35,20 +36,20 @@ function assistantText(messages: unknown): string {
       .map((b) => b.text as string)
       .join("\n")
       .trim();
-    return text || "（无文本输出）";
+    return text || "(no text output)";
   }
-  return "（无 assistant 输出）";
+  return "(no assistant output)";
 }
 
 export function initChild(pi: ExtensionAPI): void {
   const name = process.env.PI_BRANCH_NAME ?? "";
   const question = process.env.PI_BRANCH_QUESTION ?? "";
   const sidecarBase = process.env.PI_BRANCH_SIDECAR ?? "";
-  const parentShort = process.env.PI_BRANCH_PARENT ?? "主会话";
+  const parentShort = process.env.PI_BRANCH_PARENT ?? "main session";
   const valid = !!sidecarBase && !!name;
 
   let expanded = false;
-  let deliverArmed = false; // /done 已触发、等待 settled 落盘（与聚焦指令分离：无参 /done 也要交付）
+  let deliverArmed = false; // /done armed, waiting for settle to persist (separate from focus: bare /done still delivers)
   let deliverInstruction = "";
   let deliverCount = 0;
   let lastMessages: unknown;
@@ -59,19 +60,19 @@ export function initChild(pi: ExtensionAPI): void {
       (_tui: unknown, theme: unknown) => {
         const box = new Box(1, 0);
         const head =
-          fg(theme, "accent", `⎇ 分支 ${name}`) +
-          fg(theme, "muted", ` · 属 ${parentShort}`) +
-          fg(theme, "dim", ` · 已交付 ${deliverCount} 段`);
+          fg(theme, "accent", `⎇ branch ${name}`) +
+          fg(theme, "muted", ` · of ${parentShort}`) +
+          fg(theme, "dim", ` · delivered ${deliverCount}`);
         if (!expanded) {
-          const hint = fg(theme, "dim", `  (Ctrl+Alt+O 展开 · /done 回填 · /drop 放弃)`);
+          const hint = fg(theme, "dim", `  (Ctrl+Alt+O expand · /done merge · /drop discard)`);
           box.addChild(new Text(head + hint, 0, 0));
         } else {
           box.addChild(new Text(head, 0, 0));
           const docs = [
-            `${fg(theme, "toolTitle", "/done [聚焦指令]")}  交付增量回填主会话；指令决定回填物形态`,
-            `${fg(theme, "toolTitle", "/drop  [原因]")}     免回填归档，零主线消息（答疑型分支）`,
-            `${fg(theme, "dim", "示例")} /done 以"为何否掉 A 方案"为核心总结`,
-            `${fg(theme, "dim", "找回")} pi --session ${process.env.PI_SESSION_ID ?? ""}`,
+            `${fg(theme, "toolTitle", "/done [focus]")}  deliver an incremental merge to the main session; the focus instruction shapes the summary`,
+            `${fg(theme, "toolTitle", "/drop  [reason]")}  end with zero backfill (for Q&A-style branches)`,
+            `${fg(theme, "dim", "e.g.")} /done focus on why option A was rejected`,
+            `${fg(theme, "dim", "resume")} pi --session ${process.env.PI_SESSION_ID ?? ""}`,
           ].join("\n");
           box.addChild(new Text(docs, 0, 0));
         }
@@ -83,27 +84,27 @@ export function initChild(pi: ExtensionAPI): void {
 
   pi.on("session_start", (_event: unknown, ctx: unknown) => {
     renderWidget(ctx as WidgetCtx);
-    // 首条定位消息（三合一：身份+行为边界+结束协议），.booted 标记幂等
+    // First identity message (identity + boundaries + ending protocol), idempotent via .booted marker
     if (valid && question && !isBooted(sidecarBase)) {
       markBooted(sidecarBase);
       const boot = [
-        `[分支定位] 你是主会话（${parentShort}）分出的分支会话 ${name}，只讨论下面这个问题：`,
+        `[branch identity] You are branch session ${name}, forked from the main session (${parentShort}). Discuss ONLY this question:`,
         question,
-        `行为边界：不主动修改主会话管辖的文件与仓库状态（不得 commit）；实验性改动仅限临时验证并留工作区；不自行总结回填，等 /done 或 /drop 指令。`,
-        `请开始回答上述问题。`,
+        `Boundaries: do not modify files or repository state owned by the main session (never commit); experimental edits stay in the working tree; do not summarize or merge back on your own — wait for the /done or /drop command.`,
+        `Please start answering the question above.`,
       ].join("\n");
       setTimeout(() => {
         try {
           pi.sendUserMessage(boot);
         } catch {
-          // 注入失败不影响手动使用
+          // injection failure is non-fatal; manual use still works
         }
       }, 300);
     }
   });
 
   pi.registerShortcut("ctrl+alt+o", {
-    description: "展开/折叠分支身份 widget",
+    description: "Expand/collapse the branch identity widget",
     handler: (ctx: unknown) => {
       expanded = !expanded;
       renderWidget(ctx as WidgetCtx);
@@ -111,36 +112,36 @@ export function initChild(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("done", {
-    description: "交付一段增量回填主会话（/done [聚焦指令]）",
+    description: "Deliver an incremental merge to the main session (/done [focus instruction])",
     handler: async (args: string, ctx: unknown) => {
       const c = ctx as CmdCtx;
       if (!valid) {
-        c.ui.notify("不在分支会话环境（缺少 PI_BRANCH_SIDECAR）", "error");
+        c.ui.notify("Not in a branch session (PI_BRANCH_SIDECAR missing)", "error");
         return;
       }
       deliverArmed = true;
       deliverInstruction = args.trim();
-      const focus = deliverInstruction ? `以「${deliverInstruction}」为核心组织。` : "";
+      const focus = deliverInstruction ? `Organize the summary around: "${deliverInstruction}".` : "";
       const prompt = [
-        `请把自上次回填以来关于「${question}」的讨论，压缩成 ≤5 条自包含要点，面向主会话读者（它知道设计背景，但不知道本分支的新讨论）。${focus}`,
-        `只输出本分支新产生的结论，不要重述主会话已知内容。这是本分支的收尾输出，将直接回填主会话。`,
+        `Compress the discussion since the last merge about "${question}" into at most 5 self-contained bullet points, written for the main session's reader (it knows the project background but not this branch's new discussion). ${focus}`,
+        `Output only conclusions NEW to this branch — do not restate what the main session already knows. This is the closing output of this branch and will be merged back directly.`,
       ].join("\n");
-      c.ui.notify("正在生成本段回填摘要…", "info");
+      c.ui.notify("Generating merge summary…", "info");
       try {
         await pi.sendUserMessage(prompt);
       } catch (e) {
         deliverArmed = false;
-        c.ui.notify(`发送总结指令失败：${String(e)}`, "error");
+        c.ui.notify(`Failed to send summary prompt: ${String(e)}`, "error");
       }
     },
   });
 
   pi.registerCommand("drop", {
-    description: "免回填结束本分支（答疑型分支，零主线消息）",
+    description: "End this branch with zero backfill (Q&A-style, no main-session message)",
     handler: async (args: string, ctx: unknown) => {
       const c = ctx as CmdCtx;
       if (!valid) {
-        c.ui.notify("不在分支会话环境（缺少 PI_BRANCH_SIDECAR）", "error");
+        c.ui.notify("Not in a branch session (PI_BRANCH_SIDECAR missing)", "error");
         return;
       }
       writeDrop(sidecarBase, {
@@ -148,7 +149,7 @@ export function initChild(pi: ExtensionAPI): void {
         reason: args.trim() || undefined,
         at: new Date().toISOString(),
       });
-      c.ui.notify("已放弃归档（零回填），pane 即将关闭", "info");
+      c.ui.notify("Dropped (zero backfill). Closing pane…", "info");
       setTimeout(() => c.shutdown(), 500);
     },
   });
@@ -174,7 +175,7 @@ export function initChild(pi: ExtensionAPI): void {
       filesTouched: [],
     });
     const c = ctx as CmdCtx;
-    c.ui.notify(`已回填（第 ${deliverCount} 段），pane 即将关闭`, "success");
+    c.ui.notify(`Merged back (deliver ${deliverCount}). Closing pane…`, "success");
     setTimeout(() => c.shutdown(), 800);
   });
 }

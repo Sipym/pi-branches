@@ -1,8 +1,9 @@
 /**
- * pi-branches 入口：同一扩展目录同时服务父/子两种角色。
- * 父进程（用户主会话）加载时无 PI_BRANCH_ROLE，走父侧逻辑；
- * 子进程由父侧以 `PI_BRANCH_ROLE=child pi --fork ... -ne -e <本目录>` 拉起，
- * 同一目录按 env 分流到子侧逻辑。
+ * pi-branches entry point: one extension directory serving two roles.
+ * The parent process (the user's main session) loads without PI_BRANCH_ROLE and
+ * gets parent behavior; children are spawned as
+ * `PI_BRANCH_ROLE=child pi --fork ... -ne -e <this directory>` and the same
+ * directory dispatches to child behavior via that env var.
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { initParent } from "./src/parent.ts";

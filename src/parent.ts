@@ -1,9 +1,10 @@
 /**
- * 父侧扩展（主会话加载）：/ask 创建分支 pane、登记表、sidecar watcher、
- * sendMessage 静默回填（design.md §3/§4/§5）。
+ * Parent-side extension (loaded by the main session): /ask spawns branch panes,
+ * a registry, the sidecar watcher, and silent merge-back via sendMessage
+ * (design.md §3/§4/§5).
  *
- * 会话 ID 从 ctx.sessionManager.getSessionId() 获取（pi 进程自身环境无
- * PI_SESSION_ID——该 env 只注入工具子进程）。
+ * The session id comes from ctx.sessionManager.getSessionId() — the pi process
+ * itself has no PI_SESSION_ID env (that env is only injected into tool subprocesses).
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { existsSync, readdirSync, watch } from "node:fs";
@@ -16,19 +17,19 @@ import {
 } from "./registry.ts";
 import { inTmux, spawnBranchPane } from "./tmux.ts";
 
-/** shell 单引号包裹（' → '\''），问题文本安全传入 pane 命令。 */
+/** Shell single-quote wrapping (' → '\'') so question text survives the pane command. */
 function shq(s: string): string {
   return `'${s.replace(/'/g, `'\\''`)}'`;
 }
 
 function extensionRoot(): string {
-  // src/parent.ts → 扩展根目录
+  // src/parent.ts → extension root
   return dirname(dirname(fileURLToPath(import.meta.url)));
 }
 
 function formatMerge(p: DonePayload): string {
-  const head = `[分支回填 · ${p.childSessionId} · 第 ${p.deliverIndex} 段] 问题：${p.question}`;
-  const instr = p.instruction ? `\n（聚焦指令：${p.instruction}）` : "";
+  const head = `[branch merge · ${p.childSessionId} · deliver ${p.deliverIndex}] Question: ${p.question}`;
+  const instr = p.instruction ? `\n(focus: ${p.instruction})` : "";
   return `${head}${instr}\n${p.summary}`;
 }
 
@@ -54,7 +55,7 @@ export function initParent(pi: ExtensionAPI): void {
     return sid || process.env.PI_SESSION_ID || "";
   }
 
-  /** 惰性初始化：拿到 sid 后装载登记表与路径。返回是否就绪。 */
+  /** Lazy init: load registry and paths once we have a session id. Returns readiness. */
   function ensureInit(ctx: unknown): boolean {
     ui = (ctx as SessionCtx | undefined)?.ui ?? ui;
     const sid = readSid(ctx);
@@ -76,7 +77,7 @@ export function initParent(pi: ExtensionAPI): void {
     try {
       ui?.notify(msg, level);
     } catch {
-      // UI 不可用时静默（watcher 后台路径）
+      // UI unavailable (background watcher path) — stay silent
     }
   }
 
@@ -96,13 +97,13 @@ export function initParent(pi: ExtensionAPI): void {
           consume(path);
           continue;
         }
-        // 幂等：mergeId 已回填过则跳过（M2 将改为扫描 session entries 严格去重）
+        // Idempotence: skip mergeIds already delivered (M2: strict dedupe by scanning session entries)
         const rec = registry.branches.find((b) => b.childSessionId === payload.childSessionId);
         if (rec && rec.lastMergeId === payload.mergeId) {
           consume(path);
           continue;
         }
-        // 静默回填：sendMessage 不带 triggerTurn —— 只 append，不触发请求（§5.4）
+        // Silent merge-back: sendMessage without triggerTurn — append only, no request (§5.4)
         pi.sendMessage(
           {
             customType: "branch_merge",
@@ -124,7 +125,7 @@ export function initParent(pi: ExtensionAPI): void {
         }
         persist();
         consume(path);
-        notify(`分支 ${payload.childSessionId} 已回填（第 ${payload.deliverIndex} 段）`, "success");
+        notify(`Branch ${payload.childSessionId} merged back (deliver ${payload.deliverIndex})`, "success");
       } else if (f.endsWith(".drop")) {
         const path = join(dir, f);
         const payload = readJson<DropPayload>(path);
@@ -134,7 +135,7 @@ export function initParent(pi: ExtensionAPI): void {
             rec.status = "dropped";
             persist();
           }
-          notify(`分支 ${payload.childSessionId} 已放弃归档（零回填）`);
+          notify(`Branch ${payload.childSessionId} dropped (zero backfill)`);
         }
         consume(path);
       }
@@ -144,11 +145,11 @@ export function initParent(pi: ExtensionAPI): void {
   function ensureWatcher(): void {
     if (watcherStarted || !dir) return;
     watcherStarted = true;
-    handleSidecars(); // 启动即扫：补消费主会话离线期间到达的 sidecar（孤儿路径的轻量版）
+    handleSidecars(); // initial scan: consume sidecars that arrived while the session was offline
     try {
       watch(dir, { persistent: false }, () => handleSidecars());
     } catch {
-      // 目录监听失败时仍可在 /branches 时手动扫描
+      // Directory watching failed; /branches still scans on demand
     }
   }
 
@@ -159,19 +160,19 @@ export function initParent(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("ask", {
-    description: "从当前节点 fork 一个问题分支 pane（/ask <问题>）",
+    description: "Fork a question branch pane from the current node (/ask <question>)",
     handler: async (args: string, ctx: unknown) => {
       if (!ensureInit(ctx)) {
-        notify("未获取到当前会话 ID（sessionManager.getSessionId 不可用）", "error");
+        notify("Could not resolve the current session id (sessionManager.getSessionId unavailable)", "error");
         return;
       }
       const question = args.trim();
       if (!question) {
-        notify("用法：/ask <问题>", "error");
+        notify("Usage: /ask <question>", "error");
         return;
       }
       if (!inTmux()) {
-        notify("pi-branches 需要 tmux：请在 tmux 内运行 pi（extended-keys 配置见官方 docs/tmux.md）", "error");
+        notify("pi-branches requires tmux: run pi inside tmux (see extended-keys setup in the official docs/tmux.md)", "error");
         return;
       }
 
@@ -184,10 +185,10 @@ export function initParent(pi: ExtensionAPI): void {
       } catch {
         forkEntryId = undefined;
       }
-      // fork 源用父会话文件绝对路径（比 id 查找更稳）；空会话未落盘时明确报错
+      // Fork source = parent session file path (more robust than id lookup); clear error when nothing is persisted yet
       const parentFile = (ctx as SessionCtx).sessionManager?.getSessionFile?.();
       if (!parentFile || !existsSync(parentFile)) {
-        notify("主会话尚无已落盘内容：先在主会话发送一条消息，再 /ask 开分支", "error");
+        notify("Main session has no persisted content yet: send a message first, then /ask", "error");
         return;
       }
 
@@ -225,28 +226,28 @@ export function initParent(pi: ExtensionAPI): void {
       persist();
       ensureWatcher();
       notify(
-        `分支 ${name} 已创建 → tmux select-window -t ${windowName}（找回：pi --session ${childSessionId}）`,
+        `Branch ${name} created → tmux select-window -t ${windowName} (resume: pi --session ${childSessionId})`,
         "success",
       );
     },
   });
 
   pi.registerCommand("branches", {
-    description: "列出本会话全部分支状态",
+    description: "List all branches of this session",
     handler: async (_args: string, ctx: unknown) => {
       if (!ensureInit(ctx)) {
-        notify("尚无会话上下文。", "error");
+        notify("No session context yet.", "error");
         return;
       }
-      handleSidecars(); // 顺手补扫
+      handleSidecars(); // opportunistic rescan
       if (!registry || registry.branches.length === 0) {
-        notify("尚无分支。用 /ask <问题> 创建。");
+        notify("No branches yet. Create one with /ask <question>.");
         return;
       }
       const lines = registry.branches.map((b) =>
-        `  ${b.name}  [${b.status}]  已交付 ${b.deliverCount} 段  ${b.question.slice(0, 40)}`,
+        `  ${b.name}  [${b.status}]  delivered ${b.deliverCount}  ${b.question.slice(0, 40)}`,
       );
-      notify(`pi-branches（${registry.branches.length}）：\n${lines.join("\n")}`);
+      notify(`pi-branches (${registry.branches.length}):\n${lines.join("\n")}`);
     },
   });
 }

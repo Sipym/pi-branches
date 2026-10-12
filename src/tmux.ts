@@ -1,6 +1,7 @@
 /**
- * tmux 层（design.md §3.1/§3.4）：检测沿用 pi-interactive-subagents `tmux.ts:49` 先例；
- * 专用 window `branches-<parent短id>`，有界网格，永不抢主窗口焦点。
+ * tmux layer (design.md §3.1/§3.4): detection follows the pi-interactive-subagents
+ * `tmux.ts:49` precedent; a dedicated window `branches-<parent short id>` with a
+ * bounded grid that never steals focus from the main window.
  */
 import { execFileSync } from "node:child_process";
 
@@ -33,7 +34,7 @@ export interface PaneSpawn {
   window: string;
   title: string;
   cwd: string;
-  /** 完整 shell 命令（含 env 前缀）。pane 退出前保活。 */
+  /** Full shell command (with env prefix). The pane stays alive after exit. */
   command: string;
 }
 
@@ -48,10 +49,10 @@ export function spawnBranchPane(spawn: PaneSpawn): void {
     try {
       tmuxOut(["select-layout", "-t", spawn.window, "tiled"]);
     } catch {
-      // 布局失败不影响功能
+      // layout failure is non-fatal
     }
   } else {
-    // 首个分支直接以命令建窗：避免 new-window 默认自带的空 shell pane（m0-findings #1）
+    // First branch creates the window with the command directly: avoids the default empty shell pane (m0-findings #1)
     tmuxOut(["new-window", "-d", "-n", spawn.window, "-c", spawn.cwd,
       `-e`, `PI_BRANCH_PANE_TITLE=${spawn.title}`,
       "--", `printf '\\033]2;%s\\033\\\\' '${spawn.title}'; ${cmd}; exec zsh`]);

@@ -49,7 +49,7 @@ Optional closing beat: run `/branches` to flash the status list (`q1 delivered �
 - **GIF tools:** [vhs](https://github.com/charmbracelet/vhs) (scriptable, reproducible) or `terminalizer`/`asciinema` + `agg`. For a hero GIF, keep it ≤ 90s and ≥ 1000px wide.
 - Slow your typing slightly; captions carry the story.
 - Trim waiting time (agent turns) with a quick cut — don't make viewers watch generation.
-- The notice text is currently Chinese (`已创建/已回填/已放弃`); for the video you can either leave it (authentic) or we add an i18n pass before recording — decide before you record.
+- All UI text (notices, widget, identity message, merge entries) is English as of the i18n pass — safe for an international audience.
 
 ## After recording
 

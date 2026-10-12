@@ -1,7 +1,7 @@
 /**
- * 登记表（design.md §2）：父侧扩展的持久化状态。
- * 位置：~/.pi/agent/artifacts/pi-branches/<parentSessionId>/registry.json
- * sidecar 同目录：<childSessionId>.done / .drop / .booted / .consumed
+ * Registry (design.md §2): the parent-side extension's persistent state.
+ * Location: ~/.pi/agent/artifacts/pi-branches/<parentSessionId>/registry.json
+ * Sidecars live in the same dir: <childSessionId>.done / .drop / .booted / .consumed
  */
 import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
