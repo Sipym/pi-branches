@@ -81,7 +81,7 @@
 
 - 组定义：一条命令开一组（组名 `join-<ts>`），登记表内分支带 `group` 字段；组建议 2–5 个分支。
 - 子侧无感知：照常 `/done`/sidecar/关 pane；barrier 逻辑全在父侧 watcher——发现分支带 `group` 则摘要暂存登记表（pending-join），不立即回填。
-- 到齐触发：组内全部 delivered（含 pane 死亡经兑底总结的）→ 合并为一条 `branch_merge` 消息，`triggerTurn: true` 唤醒恰一次。
+- 到齐触发：组内全部 delivered（含 pane 死亡经兜底总结的）→ 合并为一条 `branch_merge` 消息，`triggerTurn: true` 唤醒恰一次。
 - content 模板：首行亮明 barrier 语义（“问题组 <group> 已全部完成（N/N）”）；每段以**问题原文为标题** + 摘要正文；结尾行为指令——“需要行动请直接继续；均无影响则一句话确认即可，不必逐条回应”。
 - details：`{ mode:"join", group, forkEntryId, branches:[{mergeId, question, childSessionId, deliverIndex}], flushed }`；幂等键 = 组内 mergeId 集合；`flushed:true` 标记手动放行。
 - 异常：不做自动超时；`--flush` 手动放行（未完成剔除注明）；`--wake` 与 `--join` 互斥；等待期主会话退出由孤儿扫描路径覆盖。
@@ -113,7 +113,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 三层标识，让分支 pane 从视觉到模型自知都可辨识（沿用于 interactive-subagents 的 widget 先例）：
 
 1. **常驻身份 widget（child 扩展，编辑器上方；定稿方案 B，经可视化预览选定）**：主题框（圆角细边框）折叠态单行——`⎇ 分支 q1 · 属 pi分叉与合并 (01a1251d) · 已交付 N 段` + 虚线脚注快捷键提示；`Ctrl+Alt+O` 展开 = **内置使用文档**：`/done [聚焦指令]`（含示例：`/done 以"为何否掉 A 方案"为核心总结`）、`/drop [原因]`（免回填归档）、当前状态、归档找回命令。**默认折叠；首次进入分支自动展开一次（教学），之后记住用户偏好**（偏好持久化于扩展 state 目录，原子写）。文档内容随命令面演进同步维护。预览参考：`~/Projects/pi-visual/pi-branches-widget`。
-2. **首条定位消息（fork 时自动注入）**：问题 + 定位说明（"你是主会话 X 的分支，仅围绕此问题讨论"）——模型侧身份自觉，治痛点 #4。
+2. **首条定位消息（fork 时自动注入，三合一）**：**身份**（你是主会话 X 在节点 Y 分出的分支，只讨论：`<问题>`）+ **行为边界**（不主动修改主会话管辖的文件与仓库状态；实验性改动仅限临时验证且**不得 commit**，改动留工作区并随 `.done` 的 filesTouched 上报；不自行回填/总结，等结束指令）+ **结束协议**（`/done [聚焦指令]` 回填 / `/drop` 免回填）。——模型侧身份自觉与权限边界，治痛点 #4、#5。
 3. **命名与 pane 标识**：tmux window `branches-<短id>`、pane title `Q:问题缩写`、会话名 `branch-<短id>-<q>`；session 文件头 `parentSession` 链接（M0 已验证存在）。
 
 `/done` 流程（子侧）：
@@ -142,6 +142,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 | 11 | 开发节奏：先在 `~/.pi` 自用打磨（M0-M4），成熟后拆出独立仓库发布（M5） | 尽早验证真实使用价值；拆出前零发布负担，拆出时历史可完整迁移 |
 | 12 | 结束二元化：`/done [聚焦指令]` 回填（指令可定制回填物形态）+ `/drop` 免回填归档；决定点在结束时而非 `/ask` 时 | 答疑型分支本就不该回填；聊完才知道要不要留、以什么视角留 |
 | 13 | 防遗忘三件套：主题框身份 widget（方案 B：默认折叠 + 首次教学 + 记忆偏好）+ 首条定位消息 + 命名约定 | 分支 pane 与普通会话视觉无区分、忘记 /done /drop 用法、子 pi 无身份自觉（痛点 #4）都直接损害可用性；文档 in place 优于查 README；经三方案可视化对比选定 |
+| 14 | 提交权在主会话：分支可实验性写文件但不主动 commit，改动留工作区 + filesTouched 留痕，集成/提交由主会话审查后决定 | q1 越权案例（痛点 #5）：分支带完整上下文易"自当主会话"；讨论产出（回填）与代码产出（提交）必须分离，否则分支会污染主线 git 历史 |
 
 补充约束：回填消息用 customType `branch_merge`，`content` 进模型上下文，结构化字段（mergeId、forkEntryId 等）放 `details`，配 entry renderer 做折叠渲染。
 
