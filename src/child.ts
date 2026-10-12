@@ -48,7 +48,8 @@ export function initChild(pi: ExtensionAPI): void {
   const valid = !!sidecarBase && !!name;
 
   let expanded = false;
-  let deliverPending: string | null = null;
+  let deliverArmed = false; // /done 已触发、等待 settled 落盘（与聚焦指令分离：无参 /done 也要交付）
+  let deliverInstruction = "";
   let deliverCount = 0;
   let lastMessages: unknown;
 
@@ -117,8 +118,9 @@ export function initChild(pi: ExtensionAPI): void {
         c.ui.notify("不在分支会话环境（缺少 PI_BRANCH_SIDECAR）", "error");
         return;
       }
-      deliverPending = args.trim() || null;
-      const focus = deliverPending ? `以「${deliverPending}」为核心组织。` : "";
+      deliverArmed = true;
+      deliverInstruction = args.trim();
+      const focus = deliverInstruction ? `以「${deliverInstruction}」为核心组织。` : "";
       const prompt = [
         `请把自上次回填以来关于「${question}」的讨论，压缩成 ≤5 条自包含要点，面向主会话读者（它知道设计背景，但不知道本分支的新讨论）。${focus}`,
         `只输出本分支新产生的结论，不要重述主会话已知内容。这是本分支的收尾输出，将直接回填主会话。`,
@@ -127,7 +129,7 @@ export function initChild(pi: ExtensionAPI): void {
       try {
         await pi.sendUserMessage(prompt);
       } catch (e) {
-        deliverPending = null;
+        deliverArmed = false;
         c.ui.notify(`发送总结指令失败：${String(e)}`, "error");
       }
     },
@@ -156,11 +158,12 @@ export function initChild(pi: ExtensionAPI): void {
   });
 
   pi.on("agent_settled", (_event: unknown, ctx: unknown) => {
-    if (!deliverPending || !valid) return;
+    if (!deliverArmed || !valid) return;
     const summary = assistantText(lastMessages);
     deliverCount += 1;
-    const instruction = deliverPending;
-    deliverPending = null;
+    const instruction = deliverInstruction;
+    deliverArmed = false;
+    deliverInstruction = "";
     writeDone(sidecarBase, {
       mergeId: randomUUID(),
       question,

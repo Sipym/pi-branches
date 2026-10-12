@@ -1,10 +1,12 @@
 /**
  * 父侧扩展（主会话加载）：/ask 创建分支 pane、登记表、sidecar watcher、
  * sendMessage 静默回填（design.md §3/§4/§5）。
+ *
+ * 会话 ID 从 ctx.sessionManager.getSessionId() 获取（pi 进程自身环境无
+ * PI_SESSION_ID——该 env 只注入工具子进程）。
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { watch } from "node:fs";
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync, watch } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { consume, readJson, type DonePayload, type DropPayload } from "./sidecar.ts";
@@ -30,31 +32,56 @@ function formatMerge(p: DonePayload): string {
   return `${head}${instr}\n${p.summary}`;
 }
 
-interface UiCtx {
+interface SessionCtx {
   ui: { notify: (msg: string, level?: string) => void };
+  sessionManager?: {
+    getSessionId?: () => string;
+    getSessionFile?: () => string;
+    getLeafId?: () => string | null;
+  };
 }
 
 export function initParent(pi: ExtensionAPI): void {
-  const parentSessionId = process.env.PI_SESSION_ID ?? "";
-  const dir = stateDir(parentSessionId);
-  const windowName = `branches-${parentSessionId.slice(0, 8)}`;
-  let registry: Registry = loadRegistry(dir, parentSessionId);
+  let parentSessionId = "";
+  let dir = "";
+  let windowName = "";
+  let registry: Registry | null = null;
   let watcherStarted = false;
-  let ui: UiCtx | null = null;
+  let ui: { notify: (msg: string, level?: string) => void } | null = null;
+
+  function readSid(ctx: unknown): string {
+    const sid = (ctx as SessionCtx | undefined)?.sessionManager?.getSessionId?.();
+    return sid || process.env.PI_SESSION_ID || "";
+  }
+
+  /** 惰性初始化：拿到 sid 后装载登记表与路径。返回是否就绪。 */
+  function ensureInit(ctx: unknown): boolean {
+    ui = (ctx as SessionCtx | undefined)?.ui ?? ui;
+    const sid = readSid(ctx);
+    if (!sid) return false;
+    if (sid !== parentSessionId) {
+      parentSessionId = sid;
+      dir = stateDir(sid);
+      windowName = `branches-${sid.slice(0, 8)}`;
+      registry = loadRegistry(dir, sid);
+    }
+    return true;
+  }
 
   function persist(): void {
-    saveRegistry(dir, registry);
+    if (dir && registry) saveRegistry(dir, registry);
   }
 
   function notify(msg: string, level = "info"): void {
     try {
-      ui?.ui.notify(msg, level);
+      ui?.notify(msg, level);
     } catch {
       // UI 不可用时静默（watcher 后台路径）
     }
   }
 
   function handleSidecars(): void {
+    if (!dir || !registry) return;
     let names: string[];
     try {
       names = readdirSync(dir);
@@ -115,9 +142,9 @@ export function initParent(pi: ExtensionAPI): void {
   }
 
   function ensureWatcher(): void {
-    if (watcherStarted) return;
+    if (watcherStarted || !dir) return;
     watcherStarted = true;
-    handleSidecars(); // 启动即扫一次：补消费主会话离线期间到达的 sidecar（孤儿路径的轻量版）
+    handleSidecars(); // 启动即扫：补消费主会话离线期间到达的 sidecar（孤儿路径的轻量版）
     try {
       watch(dir, { persistent: false }, () => handleSidecars());
     } catch {
@@ -126,21 +153,21 @@ export function initParent(pi: ExtensionAPI): void {
   }
 
   pi.on("session_start", (_event: unknown, ctx: unknown) => {
-    ui = ctx as UiCtx;
-    if (registry.branches.some((b) => b.status === "chatting")) ensureWatcher();
+    if (ensureInit(ctx)) {
+      if (registry && registry.branches.some((b) => b.status === "chatting")) ensureWatcher();
+    }
   });
 
   pi.registerCommand("ask", {
     description: "从当前节点 fork 一个问题分支 pane（/ask <问题>）",
     handler: async (args: string, ctx: unknown) => {
-      ui = ctx as UiCtx;
+      if (!ensureInit(ctx)) {
+        notify("未获取到当前会话 ID（sessionManager.getSessionId 不可用）", "error");
+        return;
+      }
       const question = args.trim();
       if (!question) {
         notify("用法：/ask <问题>", "error");
-        return;
-      }
-      if (!parentSessionId) {
-        notify("未检测到 PI_SESSION_ID（需在持久会话中运行）", "error");
         return;
       }
       if (!inTmux()) {
@@ -148,16 +175,20 @@ export function initParent(pi: ExtensionAPI): void {
         return;
       }
 
-      const name = nextBranchName(registry);
+      const name = nextBranchName(registry!);
       const childSessionId = `branch-${parentSessionId.slice(0, 8)}-${name}`;
       const sidecarBase = join(dir, childSessionId);
       let forkEntryId: string | undefined;
       try {
-        const branch = (ctx as { sessionManager?: { getBranch?: () => Array<{ id?: string }> } })
-          .sessionManager?.getBranch?.();
-        forkEntryId = branch?.at(-1)?.id;
+        forkEntryId = (ctx as SessionCtx).sessionManager?.getLeafId?.() ?? undefined;
       } catch {
         forkEntryId = undefined;
+      }
+      // fork 源用父会话文件绝对路径（比 id 查找更稳）；空会话未落盘时明确报错
+      const parentFile = (ctx as SessionCtx).sessionManager?.getSessionFile?.();
+      if (!parentFile || !existsSync(parentFile)) {
+        notify("主会话尚无已落盘内容：先在主会话发送一条消息，再 /ask 开分支", "error");
+        return;
       }
 
       const root = extensionRoot();
@@ -167,8 +198,7 @@ export function initParent(pi: ExtensionAPI): void {
         `PI_BRANCH_QUESTION=${shq(question)}`,
         `PI_BRANCH_SIDECAR=${shq(sidecarBase)}`,
         `PI_BRANCH_PARENT=${parentSessionId.slice(0, 8)}`,
-        `PI_BRANCH_SESSION_ID_FOR_FORK=${parentSessionId}`,
-        `pi --fork ${shq(parentSessionId)}`,
+        `pi --fork ${shq(parentFile)}`,
         `--session-id ${shq(childSessionId)}`,
         `-n ${shq(`branch ${name}: ${question.slice(0, 40)}`)}`,
         `-ne -e ${shq(root)}`,
@@ -182,7 +212,7 @@ export function initParent(pi: ExtensionAPI): void {
         command: childCmd,
       });
 
-      registry.branches.push({
+      registry!.branches.push({
         name,
         question,
         childSessionId,
@@ -204,9 +234,12 @@ export function initParent(pi: ExtensionAPI): void {
   pi.registerCommand("branches", {
     description: "列出本会话全部分支状态",
     handler: async (_args: string, ctx: unknown) => {
-      ui = ctx as UiCtx;
+      if (!ensureInit(ctx)) {
+        notify("尚无会话上下文。", "error");
+        return;
+      }
       handleSidecars(); // 顺手补扫
-      if (registry.branches.length === 0) {
+      if (!registry || registry.branches.length === 0) {
         notify("尚无分支。用 /ask <问题> 创建。");
         return;
       }
