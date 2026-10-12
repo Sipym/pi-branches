@@ -40,6 +40,7 @@ interface SessionCtx {
     getSessionFile?: () => string;
     getLeafId?: () => string | null;
   };
+  model?: { provider?: string; id?: string; input?: string[] };
 }
 
 export function initParent(pi: ExtensionAPI): void {
@@ -193,6 +194,16 @@ export function initParent(pi: ExtensionAPI): void {
       }
 
       const root = extensionRoot();
+      // Pin the parent's current model: fork copies the full context (including
+      // image blocks). Without an explicit --model the child's fuzzy resolution
+      // may land on a text-only variant and 400 on multimodal content (finding #6).
+      let modelArg = "";
+      try {
+        const m = (ctx as SessionCtx).model;
+        if (m?.id) modelArg = `--model ${shq(m.provider ? `${m.provider}/${m.id}` : m.id)}`;
+      } catch {
+        modelArg = "";
+      }
       const childCmd = [
         `PI_BRANCH_ROLE=child`,
         `PI_BRANCH_NAME=${name}`,
@@ -204,6 +215,7 @@ export function initParent(pi: ExtensionAPI): void {
         `-n ${shq(`branch ${name}: ${question.slice(0, 40)}`)}`,
         `-ne -e ${shq(root)}`,
         `--tools read,grep,find,ls`,
+        ...(modelArg ? [modelArg] : []),
       ].join(" ");
 
       spawnBranchPane({
