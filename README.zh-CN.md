@@ -12,13 +12,55 @@
 - **零请求回填**：结论静默 append 进 transcript，你继续工作前不烧任何 token
 - **默认安全**：分支会话只有只读工具白名单（`read/grep/find/ls`），首条身份消息明确禁止改动主会话文件与 git 状态
 
-## 安装与快速上手
+## 安装
+
+### 前置环境
+
+| 要求 | 说明 |
+|---|---|
+| [Pi coding agent](https://github.com/earendil-works/pi) ≥ 1.1.0 | 安装与模型/API key 配置见其项目 README |
+| tmux ≥ 3.2 | macOS: `brew install tmux` · Debian/Ubuntu: `apt install tmux` |
+| Pi **运行在 tmux 内** | 分支 pane 通过 tmux 创建；不在 tmux 内时 `/ask` 会明确报错 |
+
+建议的 tmux 配置——让 Pi 区分 `Shift+Enter` / `Ctrl+Enter` 与普通 `Enter`（tmux ≥ 3.5）：
+
+```tmux
+# ~/.tmux.conf
+set -g extended-keys on
+set -g extended-keys-format csi-u
+```
+
+tmux 3.2–3.4 只需 `set -g extended-keys on`；改完需重启 tmux server。详见 [Run Pi in tmux](https://github.com/earendil-works/pi/blob/main/docs/tmux.md)。
+
+### 安装与验证
 
 ```bash
 pi install git:github.com/<user>/pi-branches
 ```
 
-要求：Pi ≥ 1.1.0、tmux ≥ 3.2、在 tmux 内运行 Pi。
+`pi list` 应显示 `pi-branches`；新开一个 Pi 会话，`/branches` 能响应即安装成功。本地/开发安装同理：
+
+```bash
+git clone https://github.com/<user>/pi-branches && pi install ./pi-branches
+```
+
+更新与卸载：
+
+```bash
+pi update --extensions
+pi remove git:github.com/<user>/pi-branches
+```
+
+### 常见问题
+
+| 现象 | 处理 |
+|---|---|
+| `/ask` 报 "pi-branches requires tmux" | 先 `tmux new -s work` 再在其中运行 pi |
+| `/ask` 报 "Main session has no persisted content yet" | 先在主会话发至少一条消息（分支从已落盘历史 fork） |
+| 分支 pane 误关 | `pi --session branch-<短id>-q<N>` 可续聊；`/branches` 列出全部 id |
+| `Shift+Enter` 表现同 `Enter` | 按上文配置 `extended-keys` 并重启 tmux server |
+
+## 快速上手
 
 1. 会话任意处：`/ask 为什么缓存键要哈希请求体？`
 2. 切到 branches 窗口（tmux `prefix + '`）——分支已在回答（身份消息自动注入）

@@ -22,11 +22,51 @@ main session ──┬── /ask q1 ──▶ ┌ branch q1 ── /done ──
 
 ## Install
 
-Requires the [Pi coding agent](https://github.com/earendil-works/pi) (≥ 1.1.0), tmux, and running Pi inside tmux.
+### Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| [Pi coding agent](https://github.com/earendil-works/pi) ≥ 1.1.0 | See the project README for installation and model/API-key setup |
+| tmux ≥ 3.2 | macOS: `brew install tmux` · Debian/Ubuntu: `apt install tmux` |
+| Pi **running inside tmux** | pi-branches opens branch panes through your tmux session; outside tmux `/ask` fails fast with a clear error |
+
+Recommended tmux config — lets Pi distinguish `Shift+Enter` / `Ctrl+Enter` from plain `Enter` (tmux ≥ 3.5):
+
+```tmux
+# ~/.tmux.conf
+set -g extended-keys on
+set -g extended-keys-format csi-u
+```
+
+On tmux 3.2–3.4 use only `set -g extended-keys on`. Restart the tmux server after changing it (`tmux kill-server` saves nothing — close sessions first). Details: [Run Pi in tmux](https://github.com/earendil-works/pi/blob/main/docs/tmux.md).
+
+### Install
 
 ```bash
 pi install git:github.com/<user>/pi-branches
 ```
+
+Verify with `pi list` (should show `pi-branches`), then start a new Pi session — `/branches` responds even with zero branches. A local/dev checkout works the same way:
+
+```bash
+git clone https://github.com/<user>/pi-branches && pi install ./pi-branches
+```
+
+Update and remove:
+
+```bash
+pi update --extensions      # reconcile to the configured ref
+pi remove git:github.com/<user>/pi-branches
+```
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `/ask` → "pi-branches requires tmux" | Start tmux first (`tmux new -s work`), run `pi` inside it |
+| `/ask` → "Main session has no persisted content yet" | Send at least one message in the main session first — branches fork from persisted history |
+| Branch pane closed too soon | `pi --session branch-<shortid>-q<N>` resumes it; `/branches` lists all session ids |
+| Keys like `Shift+Enter` behave like `Enter` | Apply the `extended-keys` config above and restart the tmux server |
 
 ## Quick start (30 seconds)
 
@@ -61,11 +101,10 @@ Read the full design — lifecycle state machine, sidecar protocol, and the 14-e
 - **Subagent fan-out** (`pi-interactive-subagents`, Claude Code subagents): agent-driven children for autonomous tasks. pi-branches is the complement — *you* converse, for questions that deserve human steering. Use both.
 - **Chat branching trees** (LibreChat forking, Msty): UI-level branching for chat products. pi-branches is coding-agent native: real processes in tmux panes, tool allowlists, git-safety rules, and merge-back designed for working sessions.
 
-## Requirements & limitations
+## Limitations (roadmap)
 
-- Pi ≥ 1.1.0 · tmux ≥ 3.2 · run Pi inside tmux (`extended-keys` recommended)
-- Branches inherit the default model; a `--model` flag for cheap branch models is on the roadmap
-- Branch writes are deliberately restricted (read-only allowlist); an explicit `--write` escape hatch is on the roadmap
+- Branches inherit the default model; a `--model` flag for cheap branch models is planned
+- Branch writes are deliberately restricted (read-only allowlist); an explicit `--write` escape hatch is planned
 
 ## Acknowledgments
 
