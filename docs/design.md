@@ -1,6 +1,6 @@
 # pi-branches 设计文档
 
-- 版本：v0.3（机制 + 发布形态 + 开发节奏定稿，待实现）
+- 版本：v0.4（barrier 模式细化，待实现）
 - 日期：2026-02-14
 - 分支：`feat/pi-branches`（基线 `b764f19`；迁独立仓库后以新仓库为准）
 - 状态：设计定稿；实现从路线 M0 开始
@@ -70,9 +70,20 @@
 | `/ask <问题>` | 父 | tmux 检测 → 创建只读分支 pane，登记 |
 | `/ask --write <问题>` | 父 | 同上但开放写工具（见 §5.6） |
 | `/ask --wake <问题>` | 父 | 创建标记为唤醒式回填的分支 |
-| `/ask --join`（或多问聚合） | 父 | barrier：全部分支 done 后合并唤醒一次 |
+| `/ask --join <问题1> <问题2> …` | 父 | 一条命令开一组 barrier：组内全部分支 done 后合并成一条消息唤醒一次（见下） |
 | `/done [要点]` | 子 | 交付一段增量（见 §4） |
 | `/branches` | 父 | 列出全部分支状态，支持清理/打开归档 |
+| `/branches --flush <group>` | 父 | 手动放行 barrier：已到齐部分合并唤醒，未完成剔除并注明 |
+
+**barrier 模式细节（`--join`）**：
+
+- 组定义：一条命令开一组（组名 `join-<ts>`），登记表内分支带 `group` 字段；组建议 2–5 个分支。
+- 子侧无感知：照常 `/done`/sidecar/关 pane；barrier 逻辑全在父侧 watcher——发现分支带 `group` 则摘要暂存登记表（pending-join），不立即回填。
+- 到齐触发：组内全部 delivered（含 pane 死亡经兑底总结的）→ 合并为一条 `branch_merge` 消息，`triggerTurn: true` 唤醒恰一次。
+- content 模板：首行亮明 barrier 语义（“问题组 <group> 已全部完成（N/N）”）；每段以**问题原文为标题** + 摘要正文；结尾行为指令——“需要行动请直接继续；均无影响则一句话确认即可，不必逐条回应”。
+- details：`{ mode:"join", group, forkEntryId, branches:[{mergeId, question, childSessionId, deliverIndex}], flushed }`；幂等键 = 组内 mergeId 集合；`flushed:true` 标记手动放行。
+- 异常：不做自动超时；`--flush` 手动放行（未完成剔除注明）；`--wake` 与 `--join` 互斥；等待期主会话退出由孤儿扫描路径覆盖。
+- 适用：结论需**合在一起看**的批量问题（如多方案可行性调研综合决策）；彼此独立的结论用默认静默。
 
 ### 3.4 运行环境检测（tmux 前置条件）
 
