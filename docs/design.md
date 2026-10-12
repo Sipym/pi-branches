@@ -182,8 +182,8 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 | **M0 手工验证** | 零代码：shell alias + `pi --fork` + 手动 tmux 开窗，跑通"提问→讨论→摘要→贴回" | 体验假设成立；产出痛点清单反哺设计 |
 | **M1 核心闭环** | `/ask`（只读、单 window 网格、tmux 检测）→ `/done`（子侧总结+sidecar）→ 父侧静默回填 + 最小 widget | 3 个问题并行，全部静默落入主会话 transcript |
 | **M2 健壮性** | mergeId 幂等、登记表持久化、孤儿启动恢复、`/branches` 列表与清理 | 崩溃重启 / 主会话先退 / 手滑多次 `/done` 三类注入测试 |
-| **M3 增强** | `--wake` / `--join` barrier、`--write` + 内置轻量文件留痕、多段增量交付 | 对应 flag 行为测试 |
-| **M4 自用收尾** | 渲染打磨、双语 README（README.md + README.zh-CN.md）、按需加载进个人环境（需授权） | 真实使用一周无阻塞 |
+| ~~M3 增强~~ **降级为需求触发池（2026-10-12 自用复盘）** | 池内：`--wake`（静默+手动继续已覆盖）、`--join` barrier（低频，设计已细化备查）、`--write`+留痕（答疑型使用不需要）；多段交付 M1 已实现。真实场景出现再启动，原则：痛点驱动，不预设计 | — |
+| **M4 自用收尾** | branch_merge 折叠渲染、`--model <轻量模型>`（入口成本调节器，自 M3 并入）、双语 README（README.md + README.zh-CN.md）、持久启用（✅ 2026-10-12 已 pi install 本地源） | 真实使用一周无阻塞 |
 | **M5 拆出发布** | 拆出独立仓库（保留历史，如 subtree split）；package.json `pi` 声明、npm+git 双源、CI 版本矩阵、gallery 提交；`~/.pi` 改为 `pi install` 引用 | `pi install npm:`/`git:` 全链路可用；上游致谢与命名检查完成 |
 
 M1 步骤 0：先读 `agent/extensions/AGENTS.md` 与 `MAINTAINING.md`，依赖安装与脚本一律走 pnpm workspace（`agent/` 根），不新增扩展级 lockfile。

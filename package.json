@@ -2,6 +2,10 @@
   "name": "pi-branches",
   "private": true,
   "type": "module",
+  "keywords": ["pi-package"],
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "pnpm run typecheck"
