@@ -1,6 +1,6 @@
 # pi-branches 设计文档
 
-- 版本：v0.4（barrier 模式细化，待实现）
+- 版本：v0.5（回填可选化与定制化，待实现）
 - 日期：2026-02-14
 - 分支：`feat/pi-branches`（基线 `b764f19`；迁独立仓库后以新仓库为准）
 - 状态：设计定稿；实现从路线 M0 开始
@@ -46,7 +46,7 @@
 
 ### 3.2 sidecar 协议
 
-文件：`<childSessionFile>.done`（另有 `.exit` 记录异常退出）。
+文件：`.done`（回填交付）与 `.drop`（免回填归档，仅含 childSessionId 与时间戳），另有 `.exit` 记录异常退出。
 
 ```json
 {
@@ -55,6 +55,7 @@
   "forkEntryId": "fork 点 entryId",
   "childSessionId": "branch-q1",
   "deliverIndex": 2,
+  "instruction": "用户提供的回填聚焦指令（空 = 通用摘要）",
   "summary": "≤N 条要点的自包含结论",
   "filesTouched": []
 }
@@ -71,7 +72,8 @@
 | `/ask --write <问题>` | 父 | 同上但开放写工具（见 §5.6） |
 | `/ask --wake <问题>` | 父 | 创建标记为唤醒式回填的分支 |
 | `/ask --join <问题1> <问题2> …` | 父 | 一条命令开一组 barrier：组内全部分支 done 后合并成一条消息唤醒一次（见下） |
-| `/done [要点]` | 子 | 交付一段增量（见 §4） |
+| `/done [聚焦指令]` | 子 | 交付一段增量；聚焦指令作为总结 prompt 的核心（空 = 通用摘要）（见 §4） |
+| `/drop [原因]` | 子 | 免回填结束：答疑型分支直接归档，零主线消息 |
 | `/branches` | 父 | 列出全部分支状态，支持清理/打开归档 |
 | `/branches --flush <group>` | 父 | 手动放行 barrier：已到齐部分合并唤醒，未完成剔除并注明 |
 
@@ -102,17 +104,19 @@ const inTmux = !!process.env.TMUX && hasCommand("tmux");
 ```
 chatting ──/done──▶ delivered ──继续打字──▶ chatting(+增量) ──/done──▶ delivered …
    │                                   （每段增量独立交付，可多段）
-   └── pane 关闭/进程退出──▶ exited ──有未交付增量？──▶ 父侧兜底总结
+   ├── /drop ──▶ dropped（归档，零主线消息）
+   └── pane 关闭/进程退出──▶ exited ──有增量且无 .drop？──▶ 父侧兜底总结
+```
 ```
 
 `/done` 流程（子侧）：
 
-1. 注入最后一条 user message："把自上次回填以来关于 `<问题>` 的结论压缩成 ≤N 条自包含要点"；
+1. 注入最后一条 user message：默认为“把自上次回填以来关于 `<问题>` 的结论压缩成 ≤N 条自包含要点”；若 `/done` 带聚焦指令，则以用户指令为核心组织（如“以‘为何否掉 A 方案’为核心总结”），回填物形态随之自由：决策记录、清单、主题结论皆可，不限于通用摘要；
 2. agent 完成最后一轮，末条 assistant message 即摘要（无需扩展直调 LLM）；
 3. 原子写 `.done`（含 mergeId）；
 4. **关闭 pane**，登记表归档 session 路径（session 文件永久保留，`pi --session <id>` 可找回）。
 
-兜底（父侧）：watcher 发现 pane 死亡且无 `.done` 但有未交付增量 → 发一条消息让主 agent 读子 session 文件自行总结并决定是否纳入（此路径必然唤醒，因为需要主 agent 干活）。
+兜底（父侧）：watcher 发现 pane 死亡且无 `.done`/`.drop` 但有未交付增量 → 发一条消息让主 agent 读子 session 文件自行总结并决定是否纳入（此路径必然唤醒，因为需要主 agent 干活）；见 `.drop` 则静默归档，零消息。
 
 ## 5. Decision Log
 
@@ -129,6 +133,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 | 9 | tmux 前置检测：`$TMUX` + tmux 可执行，缺则明确报错+引导 | 避免运行时报错/静默失败；session_start 即探测并提示 |
 | 10 | 发布形态：Pi Package（npm+git 双源、MIT、上游致谢、零本机私有扩展依赖） | 开源可用性与合规优先；走生态标准安装路径 |
 | 11 | 开发节奏：先在 `~/.pi` 自用打磨（M0-M4），成熟后拆出独立仓库发布（M5） | 尽早验证真实使用价值；拆出前零发布负担，拆出时历史可完整迁移 |
+| 12 | 结束二元化：`/done [聚焦指令]` 回填（指令可定制回填物形态）+ `/drop` 免回填归档；决定点在结束时而非 `/ask` 时 | 答疑型分支本就不该回填；聊完才知道要不要留、以什么视角留 |
 
 补充约束：回填消息用 customType `branch_merge`，`content` 进模型上下文，结构化字段（mergeId、forkEntryId 等）放 `details`，配 entry renderer 做折叠渲染。
 
@@ -138,7 +143,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 2. **孤儿分支**：主会话先退出 → `.done` 无人消费。主会话下次 `session_start` 时扫登记表，发现未消费 `.done` 则提示"N 条分支结论待回填"。
 3. **主会话 `/tree` 切分支或 `/fork`**：回填目标永远是消费时刻的 active session 当前 leaf（见 §5.4）。
 4. **主会话正忙**：静默回填走 `sendMessage` 默认路径（空闲=仅 append；agent 运行中=轮末 append），不注入当前轮、不额外烧请求。
-5. **pane 堆积**：done 即关（§5.5）；`/branches` 提供 `chatting / 待回填 / 已回填 / 孤儿` 总览与清理。
+5. **pane 堆积**：done/drop 即关（§5.5）；`/branches` 提供 `chatting / 待回填 / 已回填 / 已放弃 / 孤儿` 总览与清理。
 
 ## 7. 非目标（v1）
 
@@ -159,7 +164,7 @@ chatting ──/done──▶ delivered ──继续打字──▶ chatting(+�
 
 ## 9. 测试策略
 
-沿用 `pi-interactive-subagents/test` 的 integration 模式：独立进程起父子会话、真实 tmux、fake/低成本模型；重点用例：多分支并发回填顺序、mergeId 幂等、孤儿恢复、非 tmux 环境 `/ask` 报错路径、`/done` 无增量幂等提示、`--write` 分支内置文件留痕。
+沿用 `pi-interactive-subagents/test` 的 integration 模式：独立进程起父子会话、真实 tmux、fake/低成本模型；重点用例：多分支并发回填顺序、mergeId 幂等、孤儿恢复、非 tmux 环境 `/ask` 报错路径、`/done` 无增量幂等提示、`/drop` 零消息归档、`/done <聚焦指令>` 回填物形态、`--write` 分支内置文件留痕。
 
 ## 10. 路线
 
