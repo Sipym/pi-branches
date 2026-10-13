@@ -81,6 +81,17 @@ pi remove git:github.com/<user>/pi-branches
 
 `/done` 后可继续追问、再次 `/done`（多段增量交付）。
 
+<table>
+  <tr>
+    <td><img src="docs/assets/cmd-ask.png" alt="/ask ×3——三个分支 pane 并行作答"></td>
+    <td><img src="docs/assets/cmd-done.png" alt="/done——聚焦摘要回填，pane 自动关闭"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/cmd-drop.png" alt="/drop——零回填，附分支内 widget 说明"></td>
+    <td><img src="docs/assets/cmd-branches.png" alt="/branches——两条静默回填+状态列表"></td>
+  </tr>
+</table>
+
 ## 工作原理
 
 分支是对当前会话的真实 `pi --fork`（带全量上下文与 `parentSession` 谱系）。`/done` 触发最后一轮总结，原子写 sidecar（`.done`，含幂等 `mergeId`）后关 pane；父侧 watcher 消费后以不带 `triggerTurn` 的 `sendMessage` 把摘要 append 到主会话当前 leaf——cherry-pick 语义、零请求、主会话切分支也安全。

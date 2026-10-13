@@ -94,6 +94,17 @@ pi remove git:github.com/<user>/pi-branches
 
 Branch sessions can deliver **multiple segments**: keep chatting after `/done` and deliver again.
 
+<table>
+  <tr>
+    <td><img src="docs/assets/cmd-ask.png" alt="/ask ×3 — three branch panes answering in parallel"></td>
+    <td><img src="docs/assets/cmd-done.png" alt="/done — focused summary merged back, pane closes"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/cmd-drop.png" alt="/drop — zero backfill, with the in-branch widget docs"></td>
+    <td><img src="docs/assets/cmd-branches.png" alt="/branches — two silent merges + status list"></td>
+  </tr>
+</table>
+
 ## How it works
 
 Each branch is a real `pi --fork` of your session — full context at the fork point, its own session file (`parentSession` linked). When you run `/done`, the branch runs a final summarization turn, writes an atomic sidecar file (`.done`, with a `mergeId` for idempotence), and closes. A watcher in the parent extension picks it up and calls `sendMessage` **without** `triggerTurn`: the summary is appended to the current leaf of the main transcript — cherry-pick semantics, no request fired, safe even if you've moved on or switched branches.
