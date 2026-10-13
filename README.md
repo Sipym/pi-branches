@@ -47,20 +47,20 @@ On tmux 3.2–3.4 use only `set -g extended-keys on`. Restart the tmux server af
 ### Install
 
 ```bash
-pi install git:github.com/<user>/pi-branches
+pi install git:github.com/Sipym/pi-branches
 ```
 
 Verify with `pi list` (should show `pi-branches`), then start a new Pi session — `/branches` responds even with zero branches. A local/dev checkout works the same way:
 
 ```bash
-git clone https://github.com/<user>/pi-branches && pi install ./pi-branches
+git clone https://github.com/Sipym/pi-branches && pi install ./pi-branches
 ```
 
 Update and remove:
 
 ```bash
 pi update --extensions      # reconcile to the configured ref
-pi remove git:github.com/<user>/pi-branches
+pi remove git:github.com/Sipym/pi-branches
 ```
 
 ### Troubleshooting

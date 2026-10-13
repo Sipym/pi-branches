@@ -37,20 +37,20 @@ tmux 3.2–3.4 只需 `set -g extended-keys on`；改完需重启 tmux server。
 ### 安装与验证
 
 ```bash
-pi install git:github.com/<user>/pi-branches
+pi install git:github.com/Sipym/pi-branches
 ```
 
 `pi list` 应显示 `pi-branches`；新开一个 Pi 会话，`/branches` 能响应即安装成功。本地/开发安装同理：
 
 ```bash
-git clone https://github.com/<user>/pi-branches && pi install ./pi-branches
+git clone https://github.com/Sipym/pi-branches && pi install ./pi-branches
 ```
 
 更新与卸载：
 
 ```bash
 pi update --extensions
-pi remove git:github.com/<user>/pi-branches
+pi remove git:github.com/Sipym/pi-branches
 ```
 
 ### 常见问题
