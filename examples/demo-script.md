@@ -1,7 +1,7 @@
 # pi-branches — Demo Recording Script (lean edition)
 
-**Goal:** a ~60s hero GIF for the README.
-**Story:** you read an agent's output, three questions pop up, you open three parallel branch sessions, interrogate one of them, merge back two distilled conclusions, and drop the third — your main context stays clean.
+**Goal:** a 60–90s hero GIF for the README.
+**Story:** you read an agent's output, three questions pop up, you open three parallel branch sessions, interrogate one of them, merge back two distilled conclusions, drop the third — and the main session immediately puts those conclusions to work in the final spec. The main context stays clean throughout.
 
 ---
 
@@ -76,4 +76,4 @@ Pause at each key moment and `Cmd+Shift+4` it:
 3. `cmd-drop.png` — `/drop` and the `Dropped` notice
 4. `cmd-branches.png` — the `/branches` status list
 
-**Deliverables** → `docs/assets/`: `demo.gif` (~60s, ≥1100px wide) + the four PNGs.
+**Deliverables** → `docs/assets/`: `demo.gif` (60–90s, ≥1100px wide) + the four PNGs.
