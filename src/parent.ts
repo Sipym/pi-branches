@@ -16,6 +16,7 @@ import {
   type Registry,
 } from "./registry.ts";
 import { inTmux, spawnBranchPane } from "./tmux.ts";
+import { writeCleanFork } from "./cleanfork.ts";
 
 /** Shell single-quote wrapping (' → '\'') so question text survives the pane command. */
 function shq(s: string): string {
@@ -194,9 +195,18 @@ export function initParent(pi: ExtensionAPI): void {
       }
 
       const root = extensionRoot();
-      // Pin the parent's current model: fork copies the full context (including
-      // image blocks). Without an explicit --model the child's fuzzy resolution
-      // may land on a text-only variant and 400 on multimodal content (finding #6).
+      // Sanitized fork (finding #6): `pi --fork` replays the session file
+      // verbatim, so persisted thinking/image blocks reach the request content
+      // and some providers reject them (400 code 1210). We materialize a clean
+      // copy ourselves and the child opens it directly. Also pin the parent's
+      // current model so resolution never lands on a lesser variant.
+      let forkFile = "";
+      try {
+        forkFile = writeCleanFork(parentFile, childSessionId).path;
+      } catch (err) {
+        notify(`Failed to prepare branch context: ${String(err)}`, "error");
+        return;
+      }
       let modelArg = "";
       try {
         const m = (ctx as SessionCtx).model;
@@ -210,7 +220,7 @@ export function initParent(pi: ExtensionAPI): void {
         `PI_BRANCH_QUESTION=${shq(question)}`,
         `PI_BRANCH_SIDECAR=${shq(sidecarBase)}`,
         `PI_BRANCH_PARENT=${parentSessionId.slice(0, 8)}`,
-        `pi --fork ${shq(parentFile)}`,
+        `pi --session ${shq(forkFile)}`,
         `--session-id ${shq(childSessionId)}`,
         `-n ${shq(`branch ${name}: ${question.slice(0, 40)}`)}`,
         `-ne -e ${shq(root)}`,
