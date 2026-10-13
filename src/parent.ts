@@ -221,8 +221,9 @@ export function initParent(pi: ExtensionAPI): void {
         `PI_BRANCH_SIDECAR=${shq(sidecarBase)}`,
         `PI_BRANCH_PARENT=${parentSessionId.slice(0, 8)}`,
         `pi --session ${shq(forkFile)}`,
-        `--session-id ${shq(childSessionId)}`,
-        `-n ${shq(`branch ${name}: ${question.slice(0, 40)}`)}`,
+        // NOTE: no --session-id / -n here — pi rejects them combined with
+        // --session (repro: "--session-id cannot be combined with --session").
+        // The id is already inside the sanitized file's session entry.
         `-ne -e ${shq(root)}`,
         `--tools read,grep,find,ls`,
         ...(modelArg ? [modelArg] : []),
