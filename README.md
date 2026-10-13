@@ -4,8 +4,8 @@
 
 Reading a long agent output, you often end up with a handful of questions. Asking them inline pollutes your main context with discussion the next task doesn't need — and serial Q&A feels sluggish. pi-branches gives each question its own forked session in a parallel tmux pane: you chat in all of them at once, and each branch ends by merging back a compact summary — or nothing at all.
 
-<video src="https://raw.githubusercontent.com/Sipym/pi-branches/main/docs/assets/demo.mp4" autoplay loop muted playsinline width="100%"></video>
-<p><sub>90-second walkthrough: three questions branched in parallel from a design discussion, two merged back, one dropped — then the main session finalizes the spec using the merged conclusions. (<a href="docs/assets/demo.mp4">mp4 link</a>)</sub></p>
+![pi-branches demo](docs/assets/demo.gif)
+<p><sub>90-second walkthrough: three questions branched in parallel from a design discussion, two merged back, one dropped — then the main session finalizes the spec using the merged conclusions.</sub></p>
 
 
 ```
