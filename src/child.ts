@@ -84,14 +84,22 @@ export function initChild(pi: ExtensionAPI): void {
 
   pi.on("session_start", (_event: unknown, ctx: unknown) => {
     renderWidget(ctx as WidgetCtx);
-    // First identity message (identity + boundaries + ending protocol), idempotent via .booted marker
+    // First message (pause + question-only instruction), idempotent via .booted marker
     if (valid && question && !isBooted(sidecarBase)) {
       markBooted(sidecarBase);
+      // First-message template (finding #8, final): a plain user instruction —
+      // no branch/identity/archive vocabulary at all. "Branch" is for humans
+      // (widget); the model only gets behavior constraints. Off-branch evidence:
+      // identity declarations themselves triggered the "mispasted message"
+      // rationalization and the diagnostic detour (q1/t1/t2).
       const boot = [
-        `[branch identity] You are branch session ${name}, forked from the main session (${parentShort}). Discuss ONLY this question:`,
+        `Let's pause the previous work — please don't continue any unfinished tasks, diagnostics, or pending threads from the conversation above.`,
+        ``,
+        `I just want to discuss a question:`,
+        ``,
         question,
-        `Boundaries: do not modify files or repository state owned by the main session (never commit); experimental edits stay in the working tree; do not summarize or merge back on your own — wait for the /done or /drop command.`,
-        `Please start answering the question above.`,
+        ``,
+        `Answer it directly. Discussion only: no file changes, no git operations, no summaries or status reports. I'll follow up or wrap up myself.`,
       ].join("\n");
       setTimeout(() => {
         try {
