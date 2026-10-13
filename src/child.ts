@@ -14,6 +14,23 @@ interface WidgetCtx {
 interface CmdCtx extends WidgetCtx {
   shutdown: () => void;
   ui: WidgetCtx["ui"] & { notify: (msg: string, level?: string) => void };
+  sessionManager?: { getSessionId?: () => string };
+}
+
+/** Resolve this branch's real session id (findings #9): PI_SESSION_ID is only
+ *  injected into tool subprocesses, never the pi process itself — the old
+ *  fallback `branch-<name>` mismatched the registry's branch-<parent>-<name>,
+ *  so status updates/idempotence silently no-op'd. getSessionId also survives
+ *  resume, which spawn-time env vars do not. */
+function resolveChildId(ctx: unknown, name: string): string {
+  try {
+    const sm = (ctx as CmdCtx).sessionManager;
+    const id = sm?.getSessionId?.();
+    if (id) return id;
+  } catch {
+    // fall through
+  }
+  return process.env.PI_SESSION_ID ?? `branch-${name}`;
 }
 
 /** Defensive theme wrapper: return text unchanged when theme is unavailable. */
@@ -153,7 +170,7 @@ export function initChild(pi: ExtensionAPI): void {
         return;
       }
       writeDrop(sidecarBase, {
-        childSessionId: process.env.PI_SESSION_ID ?? `branch-${name}`,
+        childSessionId: resolveChildId(ctx, name),
         reason: args.trim() || undefined,
         at: new Date().toISOString(),
       });
@@ -176,7 +193,7 @@ export function initChild(pi: ExtensionAPI): void {
     writeDone(sidecarBase, {
       mergeId: randomUUID(),
       question,
-      childSessionId: process.env.PI_SESSION_ID ?? `branch-${name}`,
+      childSessionId: resolveChildId(ctx, name),
       deliverIndex: deliverCount,
       instruction: instruction || undefined,
       summary,
