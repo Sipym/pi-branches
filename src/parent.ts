@@ -162,35 +162,35 @@ export function initParent(pi: ExtensionAPI): void {
   });
 
   pi.registerCommand("ask", {
-    description: "Fork a question branch pane (/ask [--deep] [--turns N] <question>; default: compacted archive, zero retained turns)",
+    description: "Fork a question branch pane (/ask [--compact|--turns N] <question>; default: full history)",
     handler: async (args: string, ctx: unknown) => {
       if (!ensureInit(ctx)) {
         notify("Could not resolve the current session id (sessionManager.getSessionId unavailable)", "error");
         return;
       }
-      // Flags: --deep keeps the full sanitized history (no graft); --turns N
-      // retains the last N dialog turns verbatim. Default is a zero window:
-      // retained turns can themselves trigger derailment when their content
-      // collides with the injected message (dogfooding self-reference, t3).
-      let deep = false;
-      let turns = 0;
+      // Default: full sanitized history — generic (non-self-referential)
+      // projects verified on-topic with it (G1). Truncation is opt-in:
+      // --compact = zero retained turns, --turns N = keep last N turns.
+      // Use --compact when the parent session discusses pi-branches itself
+      // (self-reference derailment, findings #8 t2/t3/t5).
+      let keepTurns = -1;
       let question = args.trim();
       for (;;) {
-        if (question.startsWith("--deep")) {
-          deep = true;
-          question = question.slice("--deep".length).trim();
+        if (question.startsWith("--compact")) {
+          keepTurns = 0;
+          question = question.slice("--compact".length).trim();
           continue;
         }
         const m = question.match(/^--turns\s+(\d+)\s*/);
         if (m) {
-          turns = Math.max(0, parseInt(m[1], 10) || 0);
+          keepTurns = Math.max(0, parseInt(m[1], 10) || 0);
           question = question.slice(m[0].length);
           continue;
         }
         break;
       }
       if (!question) {
-        notify("Usage: /ask [--deep] [--turns N] <question>", "error");
+        notify("Usage: /ask [--compact|--turns N] <question>", "error");
         return;
       }
       if (!inTmux()) {
@@ -222,7 +222,7 @@ export function initParent(pi: ExtensionAPI): void {
       // current model so resolution never lands on a lesser variant.
       let forkFile = "";
       try {
-        forkFile = writeCleanFork(parentFile, childSessionId, deep ? -1 : turns).path;
+        forkFile = writeCleanFork(parentFile, childSessionId, keepTurns).path;
       } catch (err) {
         notify(`Failed to prepare branch context: ${String(err)}`, "error");
         return;

@@ -83,7 +83,7 @@ pi remove git:github.com/<user>/pi-branches
 
 | Command | Where | What it does |
 |---|---|---|
-| `/ask <question>` | main | Fork a read-only branch pane at the current node |
+| `/ask [--compact\|--turns N] <question>` | main | Fork a read-only branch pane at the current node (full history by default; `--compact` = zero retained turns, `--turns N` = keep last N turns — use these when the session discusses pi-branches itself) |
 | `/done [focus instruction]` | branch | Deliver an incremental merge; the instruction shapes the summary |
 | `/drop [reason]` | branch | End with zero backfill (Q&A-style branches) |
 | `/branches` | main | List all branches: `chatting / delivered / dropped` |

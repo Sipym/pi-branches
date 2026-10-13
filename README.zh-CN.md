@@ -72,7 +72,7 @@ pi remove git:github.com/<user>/pi-branches
 
 | 命令 | 位置 | 作用 |
 |---|---|---|
-| `/ask <问题>` | 主会话 | 从当前节点 fork 一个只读分支 pane |
+| `/ask [--compact\|--turns N] <问题>` | 主会话 | 从当前节点 fork 一个只读分支 pane（默认全量历史；`--compact`=零窗口压缩，`--turns N`=保留最近 N 轮——当会话本身在开发/讨论 pi-branches 时使用） |
 | `/done [聚焦指令]` | 分支 | 交付一段增量回填；指令决定回填物形态 |
 | `/drop [原因]` | 分支 | 免回填结束（答疑型分支） |
 | `/branches` | 主会话 | 列出全部分支状态 |

@@ -40,7 +40,7 @@ export interface CleanForkResult {
 export function writeCleanFork(
   parentSessionFile: string,
   childSessionId: string,
-  keepTurns = 0, // retained recent dialog turns; -1 keeps the full history (--deep)
+  keepTurns = -1, // retained recent dialog turns; -1 (default) keeps the full history
 ): CleanForkResult {
   const lines = readFileSync(parentSessionFile, "utf8").split("\n").filter(Boolean);
   const out: Entry[] = [];
