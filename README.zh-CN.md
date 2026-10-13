@@ -3,7 +3,7 @@
 **[Pi coding agent](https://github.com/earendil-works/pi) 的并行问题分支扩展——在会话任意节点 fork，多个问题在并行侧会话中同时追问，只把提炼后的结论合并回主线。**
 
 读一段很长的 agent 输出时，你常会冒出一堆问题。在主会话里逐个追问，会把下个任务用不到的讨论塞进主线上下文（context rot），串行问答的体感也差。pi-branches 给每个问题一个 fork 出来的独立会话（并行 tmux pane）：你可以同时跟所有分支对话，每个分支结束时把压缩摘要静默合并回来——或者什么都不合并。
-<video src="docs/assets/demo.mp4" autoplay loop muted playsinline width="100%"></video>
+<video src="https://raw.githubusercontent.com/Sipym/pi-branches/main/docs/assets/demo.mp4" autoplay loop muted playsinline width="100%"></video>
 <p><sub>90 秒完整流程：三个问题从设计讨论中并行分出，两个回填、一个放弃——随后主会话利用回填结论完成 spec 定稿。（<a href="docs/assets/demo.mp4">mp4 链接</a>）</sub></p>
 
 ## 为什么需要
